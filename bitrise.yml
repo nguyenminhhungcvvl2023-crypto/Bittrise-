@@ -83,14 +83,14 @@ workflows:
             RDP_PID=$!
             echo "      ✅ RDP Tunnel started (PID: $RDP_PID)"
             
-            sleep 3
+            sleep 2
             
             # Tunnel cho Web Viewer (8006)
             nohup ./kami-tunnel 8006 > tunnel_web.log 2>&1 &
             WEB_PID=$!
             echo "      ✅ Web Viewer Tunnel started (PID: $WEB_PID)"
             
-            sleep 3
+            sleep 2
             
             # Tunnel cho VNC (5900)
             nohup ./kami-tunnel 5900 > tunnel_vnc.log 2>&1 &
@@ -118,23 +118,15 @@ workflows:
             RDP_IP=""
             RETRY=0
             
-            # Đợi tunnel_rdp.log có IP
-            while [ -z "$RDP_IP" ] && [ $RETRY -lt 90 ]; do
-              # Đọc từ log file của tunnel RDP
-              if [ -f tunnel_rdp.log ]; then
-                RDP_IP=$(grep -oP '\d+\.\d+\.\d+\.\d+:\d+' tunnel_rdp.log 2>/dev/null | head -1)
-                if [ -n "$RDP_IP" ]; then
-                  echo "      ✅ RDP: $RDP_IP"
-                  break
-                fi
-              fi
-              # Fallback: đọc từ kami_tunnel.txt
+            while [ -z "$RDP_IP" ] && [ $RETRY -lt 60 ]; do
               if [ -f kami_tunnel.txt ]; then
-                RDP_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
-                if [[ "$RDP_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
-                  RDP_IP="$RDP_CONTENT"
+                # Đọc IP từ file, lọc bỏ IP server Bitrise (103.78.x.x)
+                TEMP_IP=$(cat kami_tunnel.txt 2>/dev/null | grep -v "103.78" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+' | head -1)
+                if [ -n "$TEMP_IP" ]; then
+                  # LƯU VÀO BIẾN RDP_IP
+                  RDP_IP="$TEMP_IP"
                   echo "      ✅ RDP: $RDP_IP"
-                  # Xóa file ngay để tunnel tiếp theo ghi vào
+                  # XÓA FILE để tunnel tiếp theo có thể ghi vào
                   rm -f kami_tunnel.txt
                   break
                 fi
@@ -145,34 +137,27 @@ workflows:
             
             if [ -z "$RDP_IP" ]; then
               echo "      ❌ ERROR: RDP tunnel failed"
-              cat tunnel_rdp.log 2>/dev/null || true
               RDP_IP="Failed"
             fi
             
-            # Chờ một chút trước tunnel tiếp theo
-            sleep 5
+            # Chờ 3 giây cho tunnel Web ghi IP vào file mới
+            echo "      ⏳ Waiting 3s for next tunnel..."
+            sleep 3
             
             # ===== Lấy IP cho Web Viewer (Port 8006) =====
             echo "⏳ [2/3] Waiting for Web Viewer tunnel (Port 8006)..."
             WEB_IP=""
             RETRY=0
             
-            while [ -z "$WEB_IP" ] && [ $RETRY -lt 90 ]; do
-              # Đọc từ log file của tunnel Web
-              if [ -f tunnel_web.log ]; then
-                WEB_IP=$(grep -oP '\d+\.\d+\.\d+\.\d+:\d+' tunnel_web.log 2>/dev/null | head -1)
-                if [ -n "$WEB_IP" ]; then
-                  echo "      ✅ Web: $WEB_IP"
-                  break
-                fi
-              fi
-              # Fallback: đọc từ kami_tunnel.txt
+            while [ -z "$WEB_IP" ] && [ $RETRY -lt 60 ]; do
               if [ -f kami_tunnel.txt ]; then
-                WEB_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
-                if [[ "$WEB_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
-                  WEB_IP="$WEB_CONTENT"
+                # Đọc IP từ file, lọc bỏ IP server Bitrise
+                TEMP_IP=$(cat kami_tunnel.txt 2>/dev/null | grep -v "103.78" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+' | head -1)
+                if [ -n "$TEMP_IP" ]; then
+                  # LƯU VÀO BIẾN WEB_IP
+                  WEB_IP="$TEMP_IP"
                   echo "      ✅ Web: $WEB_IP"
-                  # Xóa file ngay để tunnel tiếp theo ghi vào
+                  # XÓA FILE để tunnel tiếp theo có thể ghi vào
                   rm -f kami_tunnel.txt
                   break
                 fi
@@ -186,29 +171,24 @@ workflows:
               WEB_IP="N/A"
             fi
             
-            # Chờ một chút trước tunnel cuối
-            sleep 5
+            # Chờ 3 giây cho tunnel VNC ghi IP vào file mới
+            echo "      ⏳ Waiting 3s for next tunnel..."
+            sleep 3
             
             # ===== Lấy IP cho VNC (Port 5900) =====
             echo "⏳ [3/3] Waiting for VNC tunnel (Port 5900)..."
             VNC_IP=""
             RETRY=0
             
-            while [ -z "$VNC_IP" ] && [ $RETRY -lt 90 ]; do
-              # Đọc từ log file của tunnel VNC
-              if [ -f tunnel_vnc.log ]; then
-                VNC_IP=$(grep -oP '\d+\.\d+\.\d+\.\d+:\d+' tunnel_vnc.log 2>/dev/null | head -1)
-                if [ -n "$VNC_IP" ]; then
-                  echo "      ✅ VNC: $VNC_IP"
-                  break
-                fi
-              fi
-              # Fallback: đọc từ kami_tunnel.txt
+            while [ -z "$VNC_IP" ] && [ $RETRY -lt 60 ]; do
               if [ -f kami_tunnel.txt ]; then
-                VNC_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
-                if [[ "$VNC_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
-                  VNC_IP="$VNC_CONTENT"
+                # Đọc IP từ file, lọc bỏ IP server Bitrise
+                TEMP_IP=$(cat kami_tunnel.txt 2>/dev/null | grep -v "103.78" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+' | head -1)
+                if [ -n "$TEMP_IP" ]; then
+                  # LƯU VÀO BIẾN VNC_IP
+                  VNC_IP="$TEMP_IP"
                   echo "      ✅ VNC: $VNC_IP"
+                  # Không cần xóa vì đây là tunnel cuối cùng
                   break
                 fi
               fi
@@ -221,13 +201,17 @@ workflows:
               VNC_IP="N/A"
             fi
             
-            # ===== Hiển thị thông tin kết nối - DỄ COPY =====
+            echo ""
+            echo "✅ All IPs collected!"
+            echo "   RDP: $RDP_IP"
+            echo "   Web: $WEB_IP"
+            echo "   VNC: $VNC_IP"
+            
+            # ===== Hiển thị thông tin - DỄ COPY =====
             echo ""
             echo ""
             echo "╔═══════════════════════════════════════════════════════════════════════╗"
-            echo "║                                                                       ║"
             echo "║              ✅ WINDOWS 11 PROFESSIONAL - READY                       ║"
-            echo "║                                                                       ║"
             echo "╚═══════════════════════════════════════════════════════════════════════╝"
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -263,10 +247,10 @@ workflows:
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
-            echo "💡 Copy IP addresses above for connection!"
+            echo "💡 Copy IP addresses above!"
             echo ""
             
-            # Lưu vào file cho step sau
+            # Lưu vào environment
             envman add --key RDP_IP --value "$RDP_IP"
             envman add --key WEB_IP --value "$WEB_IP"
             envman add --key VNC_IP --value "$VNC_IP"
@@ -278,47 +262,37 @@ workflows:
             #!/bin/bash
             
             echo ""
-            echo "🟢 Windows 11 session started - Running continuously..."
+            echo "🟢 Windows 11 running..."
             echo ""
             
-            # Hiển thị Docker logs ban đầu
             echo "═══════════════════════════════════════════════════════════════════════"
-            echo "  📋 DOCKER CONTAINER STATUS"
+            echo "  📋 DOCKER STATUS"
             echo "═══════════════════════════════════════════════════════════════════════"
-            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            docker ps --format "table {{.Names}}\t{{.Status}}"
             echo "═══════════════════════════════════════════════════════════════════════"
             echo ""
             
-            # Maintain session với status report mỗi 5 phút
             COUNTER=0
             while true; do
               ELAPSED=$((COUNTER * 5))
               
-              # Status report mỗi 30 phút (6 lần)
               if [ $((COUNTER % 6)) -eq 0 ]; then
                 echo ""
                 echo "═══════════════════════════════════════════════════════════════════"
-                echo "  🖥️  WINDOWS 11 - STATUS REPORT"
+                echo "  🖥️  WINDOWS 11 - STATUS"
                 echo "═══════════════════════════════════════════════════════════════════"
-                echo "  📅 Timestamp      : $(date +'%Y-%m-%d %H:%M:%S')"
-                echo "  ⏱️  Uptime         : ${ELAPSED} minutes"
-                echo "  🌐 RDP Connection : $RDP_IP"
-                echo "  🌐 Web Viewer     : http://$WEB_IP"
-                echo "  🖥️  VNC Viewer     : $VNC_IP"
-                echo "  🟢 Status         : ACTIVE & RUNNING"
+                echo "  📅 Time      : $(date +'%Y-%m-%d %H:%M:%S')"
+                echo "  ⏱️  Uptime    : ${ELAPSED} min"
+                echo "  🌐 RDP       : $RDP_IP"
+                echo "  🌐 Web       : http://$WEB_IP"
+                echo "  🖥️  VNC       : $VNC_IP"
+                echo "  🟢 Status    : ACTIVE"
                 echo "═══════════════════════════════════════════════════════════════════"
-                echo ""
-                
-                # Hiển thị một vài dòng log gần nhất
-                echo "📋 Recent Docker Logs:"
-                docker compose logs --tail=5 2>/dev/null || true
                 echo ""
               fi
               
-              # Progress indicator
-              echo -ne "  🟢 Windows 11 Active | ⏱️  Uptime: ${ELAPSED} minutes\r"
-              
-              sleep 300  # 5 phút
+              echo -ne "  🟢 Active | ⏱️  ${ELAPSED} min\r"
+              sleep 300
               COUNTER=$((COUNTER + 1))
             done
 
