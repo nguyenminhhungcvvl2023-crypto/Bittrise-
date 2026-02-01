@@ -114,131 +114,156 @@ workflows:
             echo ""
             
             # ===== Lấy IP cho RDP (Port 3389) =====
-            echo "⏳ Waiting for RDP tunnel (Port 3389)..."
+            echo "⏳ [1/3] Waiting for RDP tunnel (Port 3389)..."
             RDP_IP=""
             RETRY=0
             
-            while [ -z "$RDP_IP" ] && [ $RETRY -lt 60 ]; do
+            # Đợi tunnel_rdp.log có IP
+            while [ -z "$RDP_IP" ] && [ $RETRY -lt 90 ]; do
+              # Đọc từ log file của tunnel RDP
+              if [ -f tunnel_rdp.log ]; then
+                RDP_IP=$(grep -oP '\d+\.\d+\.\d+\.\d+:\d+' tunnel_rdp.log 2>/dev/null | head -1)
+                if [ -n "$RDP_IP" ]; then
+                  echo "      ✅ RDP: $RDP_IP"
+                  break
+                fi
+              fi
+              # Fallback: đọc từ kami_tunnel.txt
               if [ -f kami_tunnel.txt ]; then
                 RDP_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
                 if [[ "$RDP_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
                   RDP_IP="$RDP_CONTENT"
-                  echo "✅ RDP tunnel ready: $RDP_IP"
+                  echo "      ✅ RDP: $RDP_IP"
+                  # Xóa file ngay để tunnel tiếp theo ghi vào
+                  rm -f kami_tunnel.txt
                   break
                 fi
               fi
-              sleep 2
+              sleep 1
               RETRY=$((RETRY + 1))
-              if [ $((RETRY % 10)) -eq 0 ]; then
-                echo "   Still waiting... ($RETRY/60)"
-              fi
             done
             
             if [ -z "$RDP_IP" ]; then
-              echo "❌ ERROR: RDP tunnel failed"
+              echo "      ❌ ERROR: RDP tunnel failed"
               cat tunnel_rdp.log 2>/dev/null || true
-              exit 1
+              RDP_IP="Failed"
             fi
             
-            # Backup file
-            cp kami_tunnel.txt rdp_backup.txt
+            # Chờ một chút trước tunnel tiếp theo
+            sleep 5
             
             # ===== Lấy IP cho Web Viewer (Port 8006) =====
-            echo ""
-            echo "⏳ Waiting for Web Viewer tunnel (Port 8006)..."
+            echo "⏳ [2/3] Waiting for Web Viewer tunnel (Port 8006)..."
             WEB_IP=""
             RETRY=0
-            sleep 3
             
-            while [ -z "$WEB_IP" ] && [ $RETRY -lt 60 ]; do
-              if [ -f kami_tunnel.txt ]; then
-                WEB_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
-                if [[ "$WEB_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]] && [ "$WEB_CONTENT" != "$RDP_IP" ]; then
-                  WEB_IP="$WEB_CONTENT"
-                  echo "✅ Web Viewer tunnel ready: $WEB_IP"
+            while [ -z "$WEB_IP" ] && [ $RETRY -lt 90 ]; do
+              # Đọc từ log file của tunnel Web
+              if [ -f tunnel_web.log ]; then
+                WEB_IP=$(grep -oP '\d+\.\d+\.\d+\.\d+:\d+' tunnel_web.log 2>/dev/null | head -1)
+                if [ -n "$WEB_IP" ]; then
+                  echo "      ✅ Web: $WEB_IP"
                   break
                 fi
               fi
-              sleep 2
-              RETRY=$((RETRY + 1))
-              if [ $((RETRY % 10)) -eq 0 ]; then
-                echo "   Still waiting... ($RETRY/60)"
+              # Fallback: đọc từ kami_tunnel.txt
+              if [ -f kami_tunnel.txt ]; then
+                WEB_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
+                if [[ "$WEB_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
+                  WEB_IP="$WEB_CONTENT"
+                  echo "      ✅ Web: $WEB_IP"
+                  # Xóa file ngay để tunnel tiếp theo ghi vào
+                  rm -f kami_tunnel.txt
+                  break
+                fi
               fi
+              sleep 1
+              RETRY=$((RETRY + 1))
             done
             
             if [ -z "$WEB_IP" ]; then
+              echo "      ⚠️  Web Viewer tunnel not available"
               WEB_IP="N/A"
-              echo "⚠️  Web Viewer tunnel not available"
             fi
             
-            # Backup file
-            cp kami_tunnel.txt web_backup.txt
+            # Chờ một chút trước tunnel cuối
+            sleep 5
             
             # ===== Lấy IP cho VNC (Port 5900) =====
-            echo ""
-            echo "⏳ Waiting for VNC tunnel (Port 5900)..."
+            echo "⏳ [3/3] Waiting for VNC tunnel (Port 5900)..."
             VNC_IP=""
             RETRY=0
-            sleep 3
             
-            while [ -z "$VNC_IP" ] && [ $RETRY -lt 60 ]; do
-              if [ -f kami_tunnel.txt ]; then
-                VNC_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
-                if [[ "$VNC_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]] && [ "$VNC_CONTENT" != "$RDP_IP" ] && [ "$VNC_CONTENT" != "$WEB_IP" ]; then
-                  VNC_IP="$VNC_CONTENT"
-                  echo "✅ VNC tunnel ready: $VNC_IP"
+            while [ -z "$VNC_IP" ] && [ $RETRY -lt 90 ]; do
+              # Đọc từ log file của tunnel VNC
+              if [ -f tunnel_vnc.log ]; then
+                VNC_IP=$(grep -oP '\d+\.\d+\.\d+\.\d+:\d+' tunnel_vnc.log 2>/dev/null | head -1)
+                if [ -n "$VNC_IP" ]; then
+                  echo "      ✅ VNC: $VNC_IP"
                   break
                 fi
               fi
-              sleep 2
-              RETRY=$((RETRY + 1))
-              if [ $((RETRY % 10)) -eq 0 ]; then
-                echo "   Still waiting... ($RETRY/60)"
+              # Fallback: đọc từ kami_tunnel.txt
+              if [ -f kami_tunnel.txt ]; then
+                VNC_CONTENT=$(cat kami_tunnel.txt 2>/dev/null | head -1)
+                if [[ "$VNC_CONTENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
+                  VNC_IP="$VNC_CONTENT"
+                  echo "      ✅ VNC: $VNC_IP"
+                  break
+                fi
               fi
+              sleep 1
+              RETRY=$((RETRY + 1))
             done
             
             if [ -z "$VNC_IP" ]; then
+              echo "      ⚠️  VNC tunnel not available"
               VNC_IP="N/A"
-              echo "⚠️  VNC tunnel not available"
             fi
             
-            # ===== Hiển thị thông tin kết nối =====
+            # ===== Hiển thị thông tin kết nối - DỄ COPY =====
             echo ""
             echo ""
             echo "╔═══════════════════════════════════════════════════════════════════════╗"
             echo "║                                                                       ║"
             echo "║              ✅ WINDOWS 11 PROFESSIONAL - READY                       ║"
             echo "║                                                                       ║"
-            echo "╠═══════════════════════════════════════════════════════════════════════╣"
-            echo "║                                                                       ║"
-            echo "║  🔌 REMOTE DESKTOP (RDP)                                              ║"
-            echo "║  ─────────────────────────────────────────────────────────────────   ║"
-            echo "║  🌐  RDP Address    : $RDP_IP"
-            echo "║  👤  Username       : Zun                                             ║"
-            echo "║  🔐  Password       : 123456                                          ║"
-            echo "║  📍  Port           : 3389                                            ║"
-            echo "║                                                                       ║"
-            echo "║  🌐 WEB VIEWER                                                        ║"
-            echo "║  ─────────────────────────────────────────────────────────────────   ║"
-            echo "║  🔗  Web Address    : http://$WEB_IP"
-            echo "║  📍  Port           : 8006                                            ║"
-            echo "║                                                                       ║"
-            echo "║  🖥️  VNC VIEWER                                                       ║"
-            echo "║  ─────────────────────────────────────────────────────────────────   ║"
-            echo "║  🌐  VNC Address    : $VNC_IP"
-            echo "║  📍  Port           : 5900                                            ║"
-            echo "║                                                                       ║"
-            echo "║  💻 SYSTEM RESOURCES                                                  ║"
-            echo "║  ─────────────────────────────────────────────────────────────────   ║"
-            echo "║  ⚡  CPU            : 8 vCPU                                          ║"
-            echo "║  🧠  RAM            : 28GB                                            ║"
-            echo "║  💾  Storage        : 100GB                                           ║"
-            echo "║                                                                       ║"
             echo "╚═══════════════════════════════════════════════════════════════════════╝"
             echo ""
-            echo "💡 TIP: Use Web Viewer to monitor Windows installation progress!"
-            echo "💡 RDP: Best for remote desktop access"
-            echo "💡 VNC: Alternative graphical access method"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🔌 REMOTE DESKTOP (RDP)"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "IP:       $RDP_IP"
+            echo "Username: Zun"
+            echo "Password: 123456"
+            echo "Port:     3389"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🌐 WEB VIEWER"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "URL:      http://$WEB_IP"
+            echo "Port:     8006"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🖥️  VNC VIEWER"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "IP:       $VNC_IP"
+            echo "Port:     5900"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "💻 SYSTEM SPECS"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "CPU:      8 vCPU"
+            echo "RAM:      28GB"
+            echo "Storage:  100GB"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "💡 Copy IP addresses above for connection!"
             echo ""
             
             # Lưu vào file cho step sau
